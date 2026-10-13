@@ -15,6 +15,8 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "ascii.rest": "^0.4.0",
+    "cherry-markdown": "^0.11.10",
     "dompurify": "^3.3.0",
     "epubjs": "0.3.93",
     "express": "^5.1.0",

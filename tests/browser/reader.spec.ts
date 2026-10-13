@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { epubFixture, pdfFixture } from "../fixtures";
+import JSZip from "jszip";
 
 async function wordPoint(locator: Locator, word: string) {
   return locator.evaluate((element, word) => {
@@ -27,7 +28,7 @@ async function wordPoint(locator: Locator, word: string) {
 }
 async function clickWord(page: Page, locator: Locator, word: string) {
   const point = await wordPoint(locator, word);
-  await page.mouse.click(point.x, point.y);
+  await page.mouse.dblclick(point.x, point.y);
 }
 
 test("base path, assets, deep refresh, relative redirect and API errors", async ({
@@ -36,14 +37,15 @@ test("base path, assets, deep refresh, relative redirect and API errors", async 
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 1189, height: 655 });
   await page.goto("/reader/");
   await expect(
-    page.getByRole("heading", { name: "今天，读哪一本？" }),
+    page.getByRole("heading", { name: /跨过语言壁垒，\s*看见更广阔的世界/ }),
   ).toBeVisible();
   await page.screenshot({ path: ".tmp/home.png", fullPage: true });
   await page.goto("/reader/reading");
   await page.reload();
-  await expect(page.getByRole("button", { name: "选择一本书" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始阅读" })).toBeVisible();
   const redirect = await request.get("/reader?test=1", { maxRedirects: 0 });
   expect(redirect.status()).toBe(308);
   expect(redirect.headers().location).toBe("/reader/?test=1");
@@ -51,6 +53,60 @@ test("base path, assets, deep refresh, relative redirect and API errors", async 
   expect(missing.status()).toBe(404);
   expect(missing.headers()["content-type"]).toContain("json");
   expect(errors).toEqual([]);
+});
+
+test("EPUB cover is not clipped and short chapters fill the reading viewport", async ({ page }) => {
+  const fixture = await epubFixture();
+  const zip = await JSZip.loadAsync(fixture.buffer);
+  zip.file("OEBPS/one.xhtml", '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Cover</title></head><body><svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800"><text x="50" y="760">Cover translator</text></svg><p id="cover-end">End of cover</p></body></html>');
+  await page.setViewportSize({ width: 1189, height: 655 });
+  await page.goto("/reader/");
+  await page.getByLabel("选择电子书").setInputFiles({ ...fixture, buffer: await zip.generateAsync({ type: "nodebuffer" }) });
+  const cover = page.frameLocator(".epub-content iframe").first();
+  await expect(cover.locator("#cover-end")).toBeVisible();
+  await expect.poll(() => cover.locator("body").evaluate((body) => Math.ceil(body.getBoundingClientRect().bottom) <= innerHeight)).toBe(true);
+  await page.getByRole("button", { name: "目录", exact: true }).click();
+  await page.getByRole("button", { name: "The Journey", exact: true }).click();
+  const chapter = page.frameLocator(".epub-content iframe").last();
+  await expect(chapter.getByText("Another beautiful morning.")).toBeVisible();
+  const stageHeight = (await page.locator(".epub-stage").boundingBox())!.height;
+  await expect.poll(() => chapter.locator("body").evaluate(() => innerHeight)).toBeGreaterThanOrEqual(stageHeight - 48);
+});
+
+test("EPUB scrolls within a fixed window and supports zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 1189, height: 655 });
+  await page.goto("/reader/");
+  await page.getByLabel("选择电子书").setInputFiles(await epubFixture());
+  const frame = page.frameLocator(".epub-content iframe").first();
+  await expect(frame.locator("#sentence")).toBeVisible();
+  const scroller = page.locator(".epub-container");
+  const stageBounds = (await page.locator(".epub-stage").boundingBox())!;
+  const scrollBounds = (await scroller.boundingBox())!;
+  expect(Math.abs(scrollBounds.x - stageBounds.x)).toBeLessThan(2);
+  expect(Math.abs(scrollBounds.width - stageBounds.width)).toBeLessThan(2);
+  expect(Math.abs(scrollBounds.y + scrollBounds.height - stageBounds.y - stageBounds.height)).toBeLessThan(2);
+  await expect.poll(() => frame.locator("body").evaluate((el) => el.scrollWidth <= innerWidth)).toBe(true);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await frame.locator("#sentence").hover();
+  await page.mouse.wheel(0, 350);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+  await page.getByRole("button", { name: "放大", exact: true }).click();
+  await expect(page.getByText("110%", { exact: true })).toBeVisible();
+  await expect.poll(() => frame.locator("body").evaluate((el) => getComputedStyle(el).fontSize)).toBe("22px");
+  await expect(page.getByRole("button", { name: "适合宽度", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: ".tmp/epub-scroll.png" });
+});
+
+test("EPUB XML declarations and doctypes preserve chapters and navigation", async ({ page }) => {
+  await page.goto("/reader/");
+  await page.getByLabel("选择电子书").setInputFiles(await epubFixture(true));
+  const frame = page.frameLocator(".epub-content iframe").first();
+  await expect(frame.locator("body")).not.toContainText("XML declaration allowed only");
+  await expect(frame.locator("#sentence")).toBeVisible();
+  await expect(frame.locator("script")).toHaveCount(0);
+  await page.getByRole("button", { name: "目录", exact: true }).click();
+  await page.getByRole("button", { name: "The Journey", exact: true }).click();
+  await expect(page.frameLocator(".epub-content iframe").last().getByText("Another beautiful morning.")).toBeVisible();
 });
 
 test("EPUB local reading, safe content, word/Chinese/cache, font size, directory and reset", async ({
@@ -91,7 +147,7 @@ test("EPUB local reading, safe content, word/Chinese/cache, font size, directory
   const before = (
     await (await request.get("http://127.0.0.1:43138/requests")).json()
   ).length;
-  await page.getByRole("button", { name: "返回英文" }).click();
+  await page.getByRole("button", { name: "返回原文语言解释" }).click();
   await expect(page.getByRole("dialog")).toContainText(
     "Soft and calm; not rough or strong.",
   );
@@ -101,10 +157,11 @@ test("EPUB local reading, safe content, word/Chinese/cache, font size, directory
   expect(all.length).toBe(before);
   expect(all.at(-1).messages[1].content).toBe("gentle");
   await page.getByRole("button", { name: "关闭解释" }).click();
-  await page.getByLabel("字号", { exact: true }).selectOption("24");
+  await page.getByRole("button", { name: "放大", exact: true }).click();
+  await expect(page.getByText("110%", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "目录", exact: true }).click();
   await page.getByRole("button", { name: "The Journey", exact: true }).click();
-  await expect(frame.getByText("Another beautiful morning.")).toBeVisible();
+  await expect(page.frameLocator(".epub-content iframe").last().getByText("Another beautiful morning.")).toBeVisible();
   expect(remote).toEqual([]);
   expect(
     await page.evaluate(() => ({
@@ -115,7 +172,7 @@ test("EPUB local reading, safe content, word/Chinese/cache, font size, directory
   expect(errors).toEqual([]);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "今天，读哪一本？" }),
+    page.getByRole("heading", { name: /跨过语言壁垒，\s*看见更广阔的世界/ }),
   ).toBeVisible();
 });
 
@@ -151,10 +208,13 @@ test("PDF text layer, click, zoom, page navigation and scanned-page notice", asy
   expect(errors).toEqual([]);
 });
 
-test("sentence selection waits for explicit explain; network failure keeps selection and retry works", async ({
+test("sentence selection explains immediately; network failure keeps selection and retry works", async ({
   page,
 }) => {
   await page.goto("/reader/");
+  await page.route("**/reader/api/translate", (route) =>
+    route.abort("connectionfailed"),
+  );
   await page.getByLabel("选择电子书").setInputFiles(await pdfFixture());
   const sentence = page
     .locator(".textLayer span")
@@ -167,13 +227,6 @@ test("sentence selection waits for explicit explain; network failure keeps selec
     steps: 15,
   });
   await page.mouse.up();
-  await expect(
-    page.getByRole("button", { name: "解释这段文字" }),
-  ).toBeVisible();
-  await page.route("**/reader/api/translate", (route) =>
-    route.abort("connectionfailed"),
-  );
-  await page.getByRole("button", { name: "解释这段文字" }).click();
   await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
   await expect(
     page.getByRole("dialog").locator(".selected-text"),

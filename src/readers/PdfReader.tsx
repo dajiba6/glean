@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   Minus,
   Plus,
+  FolderOpen,
 } from "lucide-react";
 import { bindSelection } from "../selection";
 import type { ReaderProps } from "./types";
@@ -27,7 +28,7 @@ const options = {
 type PdfDocument = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 type PdfOutline = Awaited<ReturnType<PdfDocument["getOutline"]>>;
 
-export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
+export default function PdfReader({ file, onSelect, onNavigate, onChangeBook }: ReaderProps) {
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
   const currentPage = useRef(page);
@@ -102,8 +103,17 @@ export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
     ));
   return (
     <div className="reader-layout">
-      <div className="reading-toolbar">
+      <div
+        className="reading-toolbar"
+        onMouseLeave={(event) => {
+          if (!showToc) return;
+          const next = event.relatedTarget;
+          if (next instanceof Element && next.closest(".toc-drawer")) return;
+          setShowToc(false);
+        }}
+      >
         <button
+          data-toc-toggle
           onClick={() => {
             onNavigate();
             setShowToc((value) => !value);
@@ -113,7 +123,6 @@ export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
           <List size={17} />
           目录
         </button>
-        <span className="toolbar-divider" />
         <button
           aria-label="缩小"
           disabled={zoom <= 0.5}
@@ -143,15 +152,25 @@ export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
         >
           适合宽度
         </button>
-        <span className="toolbar-hint">点一个词，或划选一句话</span>
+        <button className="change-book" onClick={onChangeBook}>
+          <FolderOpen size={16} />
+          更换书籍
+        </button>
       </div>
       <div
         className="book-stage pdf-stage"
         ref={stage}
         onScroll={() => onNavigate()}
       >
-        {showToc && (
-          <aside className="toc">
+        <div
+          className={`toc-drawer ${showToc ? "is-open" : ""}`}
+          onMouseLeave={(event) => {
+            const next = event.relatedTarget;
+            if (next instanceof Element && next.closest(".reading-toolbar")) return;
+            setShowToc(false);
+          }}
+        >
+          <aside className="toc" inert={!showToc}>
             <h3>目录</h3>
             {outline?.length ? (
               renderOutline(outline)
@@ -159,7 +178,7 @@ export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
               <p>这本书没有目录，请使用页码跳转。</p>
             )}
           </aside>
-        )}
+        </div>
         {error && (
           <div className="pdf-error" role="alert">
             {error}
@@ -277,7 +296,7 @@ export default function PdfReader({ file, onSelect, onNavigate }: ReaderProps) {
             <ChevronRight size={18} />
           </button>
         </div>
-        <span className="footer-note">阅读位置仅保留在本次打开期间</span>
+        <span className="footer-hint">双击解释单词，划选解释句子</span>
       </div>
     </div>
   );

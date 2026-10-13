@@ -1,21 +1,82 @@
-import { useEffect, useRef, useState } from "react";
-import ePub, { type Book, type Rendition, type NavItem } from "epubjs";
-import { ChevronLeft, ChevronRight, List, LoaderCircle } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import ePub, { type Book, type Rendition, type NavItem, type Contents } from "epubjs";
+import { ChevronDown, ChevronLeft, ChevronRight, FolderOpen, List, LoaderCircle, Minus, Plus } from "lucide-react";
 import { prepareEpub } from "../sanitize";
 import { bindSelection } from "../selection";
 import type { ReaderProps, TocItem } from "./types";
+
+const WIDTHS = [
+  { value: 640, label: "窄" },
+  { value: 780, label: "适中" },
+  { value: 960, label: "宽" },
+  { value: 0, label: "铺满" },
+];
+
+function splitTarget(target: string) {
+  const hash = target.indexOf("#");
+  const path = hash >= 0 ? target.slice(0, hash) : target;
+  const id = hash >= 0 ? decodeURIComponent(target.slice(hash + 1)) : "";
+  return { path, id };
+}
+
+function sameSpineFile(sectionHref: string, targetPath: string) {
+  const clean = (value: string) =>
+    decodeURIComponent(value).split("?")[0].replace(/\\/g, "/").replace(/^\.\//, "");
+  const section = clean(sectionHref);
+  let target = clean(targetPath);
+  while (target.startsWith("../")) target = target.slice(3);
+  return section === target || section.endsWith(`/${target}`) || target.endsWith(`/${section}`);
+}
+
+function currentSectionIndex(view: Rendition, scroller: HTMLElement, items: TocItem[]) {
+  const contents = view.getContents() as unknown as Array<{
+    sectionIndex: number;
+    document: Document;
+    window: Window;
+  }>;
+  const list = Array.isArray(contents) ? contents : [];
+  const limit = scroller.getBoundingClientRect().top + 48;
+  let current = -1;
+  items.forEach((item, index) => {
+    const top = anchorTop(view, list, item.target);
+    if (top != null && top <= limit) current = index;
+  });
+  return current;
+}
+
+function anchorTop(
+  view: Rendition,
+  list: Array<{ sectionIndex: number; document: Document; window: Window }>,
+  target: string,
+) {
+  const { path, id } = splitTarget(target);
+  for (const content of list) {
+    const section = view.book.spine.get(content.sectionIndex);
+    if (!section?.href || !sameSpineFile(section.href, path)) continue;
+    const frame = content.window.frameElement;
+    if (!(frame instanceof HTMLElement)) continue;
+    const node = id ? content.document.getElementById(id) : content.document.body;
+    if (!node) continue;
+    return frame.getBoundingClientRect().top + node.getBoundingClientRect().top;
+  }
+  return null;
+}
 
 export default function EpubReader({
   file,
   onSelect,
   onNavigate,
+  onChangeBook,
 }: ReaderProps) {
   const area = useRef<HTMLDivElement>(null);
   const rendition = useRef<Rendition | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
+  const tocRef = useRef<TocItem[]>([]);
   const [showToc, setShowToc] = useState(false);
   const [fontSize, setFontSize] = useState(20);
   const [width, setWidth] = useState(780);
+  const [widthOpen, setWidthOpen] = useState(false);
+  const widthPicker = useRef<HTMLSpanElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -23,6 +84,26 @@ export default function EpubReader({
   const [edges, setEdges] = useState({ start: true, end: false });
   const callbacks = useRef({ onSelect, onNavigate });
   callbacks.current = { onSelect, onNavigate };
+
+  useEffect(() => {
+    rendition.current?.themes.fontSize(`${fontSize}px`);
+  }, [fontSize]);
+
+  useEffect(() => {
+    if (!widthOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!widthPicker.current?.contains(event.target as Node)) setWidthOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setWidthOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [widthOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -52,18 +133,38 @@ export default function EpubReader({
           if (entry.subitems) flatten(entry.subitems, depth + 1);
         });
       flatten(book.navigation.toc);
+      tocRef.current = items;
       setToc(items);
       const view = book.renderTo(area.current, {
         width: "100%",
         height: "100%",
-        flow: "paginated",
+        manager: "continuous",
+        flow: "scrolled-continuous",
+        overflow: "auto",
         spread: "none",
         allowScriptedContent: false,
       });
       rendition.current = view;
       view.hooks.content.register(
-        (contents: { document: Document; window: Window }) => {
+        (contents: Contents) => {
           const doc = contents.document;
+          if (!doc.getElementById("reader-scrollbar")) {
+            const style = doc.createElement("style");
+            style.id = "reader-scrollbar";
+            style.textContent =
+              "html,body{scrollbar-width:thin;scrollbar-color:#c5ccb8 transparent}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}::-webkit-scrollbar-thumb{background:#c5ccb8;border-radius:99px}";
+            doc.head.appendChild(style);
+          }
+          // epub.js measures a text Range, which can omit the bottom of a
+          // cover/SVG and the body's padding. Keep its pagination measurements
+          // in sync with the full chapter box, with one viewport for short chapters.
+          const textHeight = contents.textHeight.bind(contents);
+          contents.textHeight = () => Math.ceil(Math.max(
+            textHeight(),
+            doc.body.getBoundingClientRect().bottom,
+            (area.current?.clientHeight ?? 0) - 48,
+          ));
+          contents.emit("resize");
           const frame = contents.window.frameElement as HTMLElement | null;
           cleanups.push(
             bindSelection(
@@ -81,25 +182,37 @@ export default function EpubReader({
             if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
               event.preventDefault();
               callbacks.current.onNavigate();
-              void (
-                event.key === "ArrowRight" ? view.next() : view.prev()
-              ).catch(() => {
-                if (alive) setError("翻页失败，请重试。");
-              });
+              turnPage(event.key === "ArrowRight");
             }
           };
           doc.addEventListener("keydown", key);
           cleanups.push(() => doc.removeEventListener("keydown", key));
+          const wheel = (event: WheelEvent) => {
+            if (!event.ctrlKey && !event.metaKey) return;
+            event.preventDefault();
+            callbacks.current.onNavigate();
+            setFontSize((value) => Math.max(10, Math.min(40, value + (event.deltaY < 0 ? 2 : -2))));
+          };
+          doc.addEventListener("wheel", wheel, { passive: false });
+          cleanups.push(() => doc.removeEventListener("wheel", wheel));
         },
       );
       view.themes.default({
+        html: { width: "100% !important", height: "auto !important" },
         body: {
+          width: "100% !important",
+          height: "auto !important",
+          "min-height": "0 !important",
+          "box-sizing": "border-box !important",
+          background: "#fffefb",
           color: "#292f2c",
           "font-family": 'Georgia, "Noto Serif", serif',
           "line-height": "1.85 !important",
-          padding: "12px 14px !important",
+          padding: "40px 72px !important",
         },
         p: { "line-height": "1.85 !important" },
+        img: { "max-width": "100% !important", height: "auto !important" },
+        svg: { "max-width": "100% !important" },
         "::selection": { background: "#d9e7da" },
       });
       view.themes.fontSize("20px");
@@ -110,14 +223,15 @@ export default function EpubReader({
           atEnd: boolean;
           start: { href: string };
         }) => {
-          if (!alive) return;
-          setEdges({ start: location.atStart, end: location.atEnd });
-          setChapter(
-            items.find(
-              (item) =>
-                item.target.split("#")[0] === location.start.href.split("#")[0],
-            )?.label || "正文",
-          );
+          if (!alive || !area.current) return;
+          const index = currentSectionIndex(view, area.current, items);
+          if (items.length) {
+            setEdges({ start: index <= 0, end: index >= items.length - 1 });
+            setChapter(items[index >= 0 ? index : 0]?.label || "正文");
+          } else {
+            setEdges({ start: location.atStart, end: location.atEnd });
+            setChapter("正文");
+          }
         },
       );
       view.on("displayError", () => {
@@ -165,18 +279,37 @@ export default function EpubReader({
       setError("章节无法显示，请重试。");
     }
   };
-  const turn = async (next: boolean) => {
-    onNavigate();
-    try {
-      await (next ? rendition.current?.next() : rendition.current?.prev());
-    } catch {
-      setError("翻页失败，请重试。");
+  const turnPage = (next: boolean) => {
+    const scroller = area.current?.querySelector(".epub-container");
+    const view = rendition.current;
+    const items = tocRef.current;
+    if (!(scroller instanceof HTMLElement) || !view) return;
+    if (!items.length) {
+      scroller.scrollTop += (next ? 1 : -1) * scroller.clientHeight;
+      return;
     }
+    const current = currentSectionIndex(view, scroller, items);
+    const target = items[next ? current + 1 : current - 1];
+    if (!target) return;
+    void view.display(target.target).catch(() => setError("翻页失败，请重试。"));
+  };
+  const turn = (next: boolean) => {
+    onNavigate();
+    turnPage(next);
   };
   return (
     <div className="reader-layout">
-      <div className="reading-toolbar">
+      <div
+        className="reading-toolbar"
+        onMouseLeave={(event) => {
+          if (!showToc) return;
+          const next = event.relatedTarget;
+          if (next instanceof Element && next.closest(".toc-drawer")) return;
+          setShowToc(false);
+        }}
+      >
         <button
+          data-toc-toggle
           onClick={() => {
             onNavigate();
             setShowToc((value) => !value);
@@ -186,46 +319,70 @@ export default function EpubReader({
           <List size={17} />
           目录
         </button>
-        <span className="toolbar-divider" />
-        <label>
-          字号{" "}
-          <select
-            aria-label="字号"
-            value={fontSize}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              setFontSize(value);
-              rendition.current?.themes.fontSize(`${value}px`);
+        <span className="font-controls">
+          <span className="control-label">字体</span>
+          <span className="font-stepper">
+            <button aria-label="缩小" disabled={fontSize <= 10} onClick={() => {
               onNavigate();
-            }}
-          >
-            {[16, 18, 20, 22, 24, 28].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          宽度{" "}
-          <select
-            aria-label="阅读宽度"
-            value={width}
-            onChange={(event) => {
-              setWidth(Number(event.target.value));
+              setFontSize((value) => Math.max(10, value - 2));
+            }}><Minus size={16} /></button>
+            <span className="zoom-label">{fontSize * 5}%</span>
+            <button aria-label="放大" disabled={fontSize >= 40} onClick={() => {
               onNavigate();
-            }}
-          >
-            <option value={640}>窄</option>
-            <option value={780}>适中</option>
-            <option value={960}>宽</option>
-          </select>
-        </label>
-        <span className="toolbar-hint">点一个词，或划选一句话</span>
+              setFontSize((value) => Math.min(40, value + 2));
+            }}><Plus size={16} /></button>
+          </span>
+        </span>
+        <span className="width-control">
+          <span className="control-label">宽度</span>
+          <span className="width-picker" ref={widthPicker}>
+            <button
+              aria-label="阅读宽度"
+              aria-haspopup="listbox"
+              aria-expanded={widthOpen}
+              onClick={() => {
+                onNavigate();
+                setWidthOpen((open) => !open);
+              }}
+            >
+              {WIDTHS.find((item) => item.value === width)?.label}
+              <ChevronDown size={14} />
+            </button>
+            {widthOpen && (
+              <div className="width-menu" role="listbox" aria-label="阅读宽度">
+                {WIDTHS.map((item) => (
+                  <button
+                    key={item.value}
+                    role="option"
+                    aria-selected={item.value === width}
+                    onClick={() => {
+                      setWidth(item.value);
+                      setWidthOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+        </span>
+        <button className="change-book" onClick={onChangeBook}>
+          <FolderOpen size={16} />
+          更换书籍
+        </button>
       </div>
-      <div className="book-stage">
-        {showToc && (
-          <aside className="toc">
+      <div className="book-stage epub-stage">
+        <div
+          className={`toc-drawer ${showToc ? "is-open" : ""}`}
+          onMouseLeave={(event) => {
+            const next = event.relatedTarget;
+            if (next instanceof Element && next.closest(".reading-toolbar")) return;
+            setShowToc(false);
+          }}
+        >
+          <aside className="toc" inert={!showToc}>
             <h3>目录</h3>
             {toc.length ? (
               toc.map((item, index) => (
@@ -241,9 +398,9 @@ export default function EpubReader({
               <p>这本书没有目录。</p>
             )}
           </aside>
-        )}
-        <div className="epub-paper" style={{ maxWidth: width }}>
-          <div className="epub-content" ref={area} />
+        </div>
+        <div className="epub-paper" style={{ "--epub-page-width": width ? `${width}px` : "100%" } as CSSProperties}>
+          <div className="epub-content" ref={area} onScrollCapture={() => callbacks.current.onNavigate()} />
           {loading && !error && (
             <div className="stage-message">
               <LoaderCircle className="spin" />
@@ -267,24 +424,23 @@ export default function EpubReader({
       </div>
       <div className="reading-footer">
         <span className="chapter-name">{chapter || "EPUB"}</span>
-        <div className="page-controls">
+        <div className="page-controls epub-turn">
           <button
             aria-label="上一页"
             disabled={loading || edges.start}
-            onClick={() => void turn(false)}
+            onClick={() => turn(false)}
           >
             <ChevronLeft size={18} />
           </button>
-          <span>翻页阅读</span>
           <button
             aria-label="下一页"
             disabled={loading || edges.end}
-            onClick={() => void turn(true)}
+            onClick={() => turn(true)}
           >
             <ChevronRight size={18} />
           </button>
         </div>
-        <span className="footer-note">阅读位置仅保留在本次打开期间</span>
+        <span className="footer-hint">双击解释单词，划选解释句子</span>
       </div>
     </div>
   );

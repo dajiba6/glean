@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
-export async function epubFixture() {
+export async function epubFixture(withXmlProlog = false) {
   const zip = new JSZip();
   zip.file("mimetype", "application/epub+zip");
   zip.file(
@@ -32,6 +32,12 @@ export async function epubFixture() {
     "OEBPS/art.svg",
     '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="16"><rect width="64" height="16" fill="#9bab82"/><script>alert(1)</script></svg>',
   );
+  if (withXmlProlog) {
+    for (const name of ["nav.xhtml", "one.xhtml", "two.xhtml"]) {
+      const path = `OEBPS/${name}`;
+      zip.file(path, '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n' + await zip.file(path)!.async("string"));
+    }
+  }
   return {
     name: "A Quiet Garden.epub",
     mimeType: "application/epub+zip",

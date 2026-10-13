@@ -7,6 +7,15 @@ const unsafeUrl = (value: string) =>
   ) && !/^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(value.trim());
 
 export function sanitizeChapter(source: string, svg = false) {
+  // Parse full XHTML before sanitizing: DOMPurify wraps string input in a body,
+  // which puts XML declarations and doctypes in an invalid position.
+  let input: string | Element = source;
+  if (!svg) {
+    const document = new DOMParser().parseFromString(source, "application/xhtml+xml");
+    if (document.querySelector("parsererror"))
+      throw new Error("书籍章节无法解析，请检查 EPUB 文件。");
+    input = document.documentElement;
+  }
   const purifier = createDOMPurify(window);
   purifier.addHook("uponSanitizeAttribute", (_node, data) => {
     if (
@@ -17,7 +26,7 @@ export function sanitizeChapter(source: string, svg = false) {
     )
       data.keepAttr = false;
   });
-  return purifier.sanitize(source, {
+  return purifier.sanitize(input, {
     WHOLE_DOCUMENT: !svg,
     FORCE_BODY: false,
     FORBID_TAGS: [

@@ -7,18 +7,15 @@ import {
   useState,
 } from "react";
 import {
-  ArrowUpRight,
   BookOpen,
-  Check,
-  FileText,
-  FolderOpen,
   Languages,
-  Leaf,
   LoaderCircle,
   MousePointer2,
   Upload,
 } from "lucide-react";
 import Explanation from "./Explanation";
+import AuroraBackground from "./AuroraBackground";
+import { PixelBook, PixelWordmark } from "./PixelBrand";
 import type { ReadingSelection } from "./selection";
 
 const EpubReader = lazy(() => import("./readers/EpubReader"));
@@ -31,6 +28,7 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [selection, setSelection] = useState<ReadingSelection | null>(null);
   const [selectionId, setSelectionId] = useState(0);
+  const [closing, setClosing] = useState(false);
   const [health, setHealth] = useState<
     "checking" | "ready" | "unconfigured" | "offline"
   >("checking");
@@ -39,8 +37,17 @@ export default function App() {
   const input = useRef<HTMLInputElement>(null);
   const cache = useRef(new Map<string, string>());
   const dragCount = useRef(0);
-  const closeExplanation = useCallback(() => setSelection(null), []);
+  const selectionRef = useRef<ReadingSelection | null>(null);
+  selectionRef.current = selection;
+  const closeExplanation = useCallback(() => {
+    if (selectionRef.current) setClosing(true);
+  }, []);
+  const finishClose = useCallback(() => {
+    setSelection(null);
+    setClosing(false);
+  }, []);
   const select = useCallback((value: ReadingSelection) => {
+    setClosing(false);
     setSelection(value);
     setSelectionId((id) => id + 1);
   }, []);
@@ -126,52 +133,27 @@ export default function App() {
           event.target.value = "";
         }}
       />
-      <header className="site-header">
-        <button
-          className="brand"
-          onClick={() => {
-            setFile(null);
-            setSelection(null);
-            cache.current.clear();
-          }}
-          aria-label="返回首页"
-        >
-          <span className="brand-icon">
-            <BookOpen size={21} />
-          </span>
-          <span>
-            Reader<span className="brand-dot">.</span>
-          </span>
-        </button>
-        {file ? (
-          <>
-            <div className="book-title">
-              <span className="format-tag">
-                {file.name.split(".").pop()?.toUpperCase()}
-              </span>
-              <span title={file.name}>
-                {file.name.replace(/\.(epub|pdf)$/i, "")}
-              </span>
-            </div>
-            <button
-              className="secondary"
-              onClick={() => input.current?.click()}
-            >
-              <FolderOpen size={16} />
-              更换书籍
-            </button>
-          </>
-        ) : (
-          <span className="header-note">
-            <Leaf size={14} /> 给阅读留一点空间
-          </span>
-        )}
-      </header>
-      {file && health !== "ready" && health !== "checking" && (
+      {!file && (
+        <header className="site-header">
+          <button
+            className="brand"
+            onClick={() => {
+              setFile(null);
+              setSelection(null);
+              cache.current.clear();
+            }}
+            aria-label="返回首页"
+          >
+            <span className="brand-icon">
+              <PixelBook />
+            </span>
+            <PixelWordmark />
+          </button>
+        </header>
+      )}
+      {file && health === "offline" && (
         <div className="service-notice">
-          {health === "unconfigured"
-            ? "阅读已就绪。模型配置完成后，即可使用选词解释。"
-            : "暂时无法连接解释服务，你仍可继续阅读。"}
+          暂时无法连接解释服务，你仍可继续阅读。
           <button onClick={() => setCheckId((value) => value + 1)}>
             重新检查
           </button>
@@ -198,6 +180,7 @@ export default function App() {
               file={file}
               onSelect={select}
               onNavigate={closeExplanation}
+              onChangeBook={() => input.current?.click()}
             />
           ) : (
             <PdfReader
@@ -205,48 +188,33 @@ export default function App() {
               file={file}
               onSelect={select}
               onNavigate={closeExplanation}
+              onChangeBook={() => input.current?.click()}
             />
           )}
         </Suspense>
       ) : (
         <main className="welcome">
+          <div className="welcome-panel welcome-hero">
           <section className="intro">
-            <div className="eyebrow">
-              <span /> A LITTLE HELP, A LOT MORE READING
-            </div>
             <h1>
-              让英文阅读，
+              跨过语言壁垒，
               <br />
-              少一点打断<span className="accent">。</span>
+              看见更广阔的世界
             </h1>
             <p>
-              打开一本书，留在它的故事里。
-              <br />
-              遇到陌生的词句，用简单英文慢慢读懂。
+              <strong>在原文环境中，读懂你想读懂的作品。</strong>
+              遇到不懂的词句，先用同一种语言去理解它。还是无法理解，才进入中文。
             </p>
           </section>
           <section className="open-card">
-            <div className="open-card-top">
-              <div className="book-illustration">
-                <BookOpen size={42} strokeWidth={1.2} />
-                <span className="small-spark">✦</span>
-              </div>
-              <span className="card-index">01 / 开始阅读</span>
-            </div>
-            <h2>今天，读哪一本？</h2>
-            <p>将电子书拖到这里，或从电脑中选择。</p>
+            <AuroraBackground />
             <button className="primary" onClick={() => input.current?.click()}>
               <Upload size={17} />
-              选择一本书 <ArrowUpRight size={17} />
+              开始阅读
             </button>
             <div className="format-list">
               <span>EPUB</span>
               <span>PDF</span>
-              <small>PDF 需包含可选择的文字</small>
-            </div>
-            <div className="local-note">
-              <Check size={14} />
-              文件仅在浏览器中打开，不上传整本书
             </div>
           </section>
           <section className="how-it-works">
@@ -254,15 +222,15 @@ export default function App() {
               <span className="step-icon">
                 <MousePointer2 size={19} />
               </span>
-              <h3>遇见一个生词</h3>
-              <p>点一下单词，或划选一段文字。</p>
+              <h3>遇见卡住的地方</h3>
+              <p>双击一个单词，或划选一段文字。</p>
             </div>
             <div>
               <span className="step-icon">
                 <BookOpen size={19} />
               </span>
-              <h3>先用英文理解</h3>
-              <p>用更简单的英文，解释眼前的文字。</p>
+              <h3>在原文语言里理解</h3>
+              <p>用这本书的语言，把意思说得更简单。</p>
             </div>
             <div>
               <span className="step-icon">
@@ -272,13 +240,56 @@ export default function App() {
               <p>点击「看不懂」，再多一点帮助。</p>
             </div>
           </section>
-          <footer className="welcome-footer">
-            <span>
-              <FileText size={13} />
-              临时阅读 · 不保存阅读记录
-            </span>
-            <span>仅选中文字会经服务器发送给配置的模型服务</span>
-          </footer>
+          </div>
+          <div className="welcome-panel">
+          <section className="reading-features" aria-labelledby="features-title">
+            <div className="section-intro">
+              <span className="section-eyebrow">从兴趣出发，留在原文里</span>
+              <h2 id="features-title">让解释，也成为语言输入</h2>
+              <p>你想读的那本书，可能还稍微有点难。Reader 帮你解开眼前的词句，让阅读继续。</p>
+            </div>
+            <div className="feature-grid">
+              <article>
+                <span className="feature-number">01</span>
+                <h3>读你真正想读的原著</h3>
+                <p>打开自己的 EPUB 或 PDF，从小说、随笔或感兴趣的非虚构作品开始。保留原著的内容，让好奇心带你翻到下一页。</p>
+              </article>
+              <article>
+                <span className="feature-number">02</span>
+                <h3>卡住的地方，就地解开</h3>
+                <p>双击生词，或划选一段文字，在阅读页里查看解释。理解这一处，再接着读下去。</p>
+              </article>
+              <article>
+                <span className="feature-number">03</span>
+                <h3>跟着原文的语言走</h3>
+                <p>让解释成为原文阅读的一部分，中文留作需要时的帮助。</p>
+              </article>
+            </div>
+          </section>
+          </div>
+          <div className="welcome-panel">
+          <section className="learning-theory" aria-labelledby="theory-title">
+            <div className="section-intro">
+              <span className="section-eyebrow">设计背后的语言学习理念</span>
+              <h2 id="theory-title">为什么先用原文的语言解释？</h2>
+              <p>Reader 的设计受到语言学家 Stephen Krashen 的第二语言习得理论启发：在感兴趣的阅读中，接触更多能够理解的原文。</p>
+            </div>
+            <div className="theory-list">
+              <article>
+                <div><span>可理解输入假说</span><h3>理解，是语言习得的起点</h3></div>
+                <p>这一假说认为，人通过理解包含略高于现有水平的语言内容来发展语言能力。Reader 用同一种语言里更简单的词句解释难点，帮助你读懂眼前的原文，让解释本身也成为语言输入。</p>
+              </article>
+              <article>
+                <div><span>习得与学习假说</span><h3>在理解意思的过程中，熟悉语言</h3></div>
+                <p>Krashen 区分了在有意义的交流中自然习得语言，与有意识地学习语言规则。Reader 鼓励你把注意力放在故事、观点和表达上，先通过原文语言理解，中文作为需要时的辅助。</p>
+              </article>
+              <article>
+                <div><span>情感过滤假说</span><h3>少一点焦虑，多一点阅读的意愿</h3></div>
+                <p>这一假说强调动机、自信和焦虑对语言习得的影响。自己选择感兴趣的原著，卡住时随时获得帮助，是 Reader 希望降低阅读压力、支持持续阅读的方式。</p>
+              </article>
+            </div>
+          </section>
+          </div>
         </main>
       )}
       {selection && (
@@ -286,7 +297,9 @@ export default function App() {
           key={selectionId}
           selection={selection}
           cache={cache.current}
+          closing={closing}
           onClose={closeExplanation}
+          onExited={finishClose}
           timeoutMs={requestTimeoutMs}
         />
       )}
