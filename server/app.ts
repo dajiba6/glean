@@ -12,25 +12,25 @@ export function createApp(config: Config, fetchModel: typeof fetch = fetch) {
     res.setHeader("Referrer-Policy", "no-referrer");
     next();
   });
-  app.get(/^\/reader$/, (req, res) => {
+  app.get(/^\/glean$/, (req, res) => {
     const query = req.originalUrl.includes("?")
       ? req.originalUrl.slice(req.originalUrl.indexOf("?"))
       : "";
-    res.redirect(308, `/reader/${query}`);
+    res.redirect(308, `/glean/${query}`);
   });
-  app.use("/reader/api", (_req, res, next) => {
+  app.use("/glean/api", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  app.get("/reader/api/health", (_req, res) =>
+  app.get("/glean/api/health", (_req, res) =>
     res.json({
       status: "ok",
       llmConfigured: isConfigured(config),
       translationTimeoutMs: config.llm.timeoutMs,
     }),
   );
-  app.use("/reader/api", express.json({ limit: "1mb" }));
-  app.post("/reader/api/translate", async (req, res) => {
+  app.use("/glean/api", express.json({ limit: "1mb" }));
+  app.post("/glean/api/translate", async (req, res) => {
     const { text, language } = req.body || {};
     if (
       typeof text !== "string" ||
@@ -141,7 +141,7 @@ export function createApp(config: Config, fetchModel: typeof fetch = fetch) {
       clearTimeout(timeout);
     }
   });
-  app.use("/reader/api", (_req, res) =>
+  app.use("/glean/api", (_req, res) =>
     res.status(404).json({ error: "接口不存在。" }),
   );
   app.use(((err: { type?: string }, _req, res, _next) => {

@@ -18,11 +18,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 const options = {
-  cMapUrl: "/reader/pdf-assets/cmaps/",
+  cMapUrl: "/glean/pdf-assets/cmaps/",
   cMapPacked: true,
-  standardFontDataUrl: "/reader/pdf-assets/standard_fonts/",
-  wasmUrl: "/reader/pdf-assets/wasm/",
-  iccUrl: "/reader/pdf-assets/iccs/",
+  standardFontDataUrl: "/glean/pdf-assets/standard_fonts/",
+  wasmUrl: "/glean/pdf-assets/wasm/",
+  iccUrl: "/glean/pdf-assets/iccs/",
   isEvalSupported: false,
 };
 type PdfDocument = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;

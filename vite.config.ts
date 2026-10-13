@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const pdfRoot = dirname(require.resolve("pdfjs-dist/package.json"));
 
 export default defineConfig({
-  base: "/reader/",
+  base: "/glean/",
   plugins: [
     react(),
     {

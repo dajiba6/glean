@@ -38,18 +38,18 @@ test("base path, assets, deep refresh, relative redirect and API errors", async 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1189, height: 655 });
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await expect(
     page.getByRole("heading", { name: /跨过语言壁垒，\s*看见更广阔的世界/ }),
   ).toBeVisible();
   await page.screenshot({ path: ".tmp/home.png", fullPage: true });
-  await page.goto("/reader/reading");
+  await page.goto("/glean/reading");
   await page.reload();
   await expect(page.getByRole("button", { name: "开始阅读" })).toBeVisible();
-  const redirect = await request.get("/reader?test=1", { maxRedirects: 0 });
+  const redirect = await request.get("/glean?test=1", { maxRedirects: 0 });
   expect(redirect.status()).toBe(308);
-  expect(redirect.headers().location).toBe("/reader/?test=1");
-  const missing = await request.get("/reader/api/missing");
+  expect(redirect.headers().location).toBe("/glean/?test=1");
+  const missing = await request.get("/glean/api/missing");
   expect(missing.status()).toBe(404);
   expect(missing.headers()["content-type"]).toContain("json");
   expect(errors).toEqual([]);
@@ -60,7 +60,7 @@ test("EPUB cover is not clipped and short chapters fill the reading viewport", a
   const zip = await JSZip.loadAsync(fixture.buffer);
   zip.file("OEBPS/one.xhtml", '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Cover</title></head><body><svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800"><text x="50" y="760">Cover translator</text></svg><p id="cover-end">End of cover</p></body></html>');
   await page.setViewportSize({ width: 1189, height: 655 });
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await page.getByLabel("选择电子书").setInputFiles({ ...fixture, buffer: await zip.generateAsync({ type: "nodebuffer" }) });
   const cover = page.frameLocator(".epub-content iframe").first();
   await expect(cover.locator("#cover-end")).toBeVisible();
@@ -75,7 +75,7 @@ test("EPUB cover is not clipped and short chapters fill the reading viewport", a
 
 test("EPUB scrolls within a fixed window and supports zoom", async ({ page }) => {
   await page.setViewportSize({ width: 1189, height: 655 });
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await page.getByLabel("选择电子书").setInputFiles(await epubFixture());
   const frame = page.frameLocator(".epub-content iframe").first();
   await expect(frame.locator("#sentence")).toBeVisible();
@@ -98,7 +98,7 @@ test("EPUB scrolls within a fixed window and supports zoom", async ({ page }) =>
 });
 
 test("EPUB XML declarations and doctypes preserve chapters and navigation", async ({ page }) => {
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await page.getByLabel("选择电子书").setInputFiles(await epubFixture(true));
   const frame = page.frameLocator(".epub-content iframe").first();
   await expect(frame.locator("body")).not.toContainText("XML declaration allowed only");
@@ -119,7 +119,7 @@ test("EPUB local reading, safe content, word/Chinese/cache, font size, directory
   page.on("request", (req) => {
     if (req.url().startsWith("https:")) remote.push(req.url());
   });
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await page.getByLabel("选择电子书").setInputFiles(await epubFixture());
   const frame = page.frameLocator(".epub-content iframe").first();
   await expect(frame.locator("#sentence")).toBeVisible();
@@ -181,7 +181,7 @@ test("PDF text layer, click, zoom, page navigation and scanned-page notice", asy
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/reader/");
+  await page.goto("/glean/");
   await page.getByLabel("选择电子书").setInputFiles(await pdfFixture());
   const sentence = page
     .locator(".textLayer span")
@@ -211,8 +211,8 @@ test("PDF text layer, click, zoom, page navigation and scanned-page notice", asy
 test("sentence selection explains immediately; network failure keeps selection and retry works", async ({
   page,
 }) => {
-  await page.goto("/reader/");
-  await page.route("**/reader/api/translate", (route) =>
+  await page.goto("/glean/");
+  await page.route("**/glean/api/translate", (route) =>
     route.abort("connectionfailed"),
   );
   await page.getByLabel("选择电子书").setInputFiles(await pdfFixture());
@@ -231,7 +231,7 @@ test("sentence selection explains immediately; network failure keeps selection a
   await expect(
     page.getByRole("dialog").locator(".selected-text"),
   ).toContainText("gentle breeze");
-  await page.unroute("**/reader/api/translate");
+  await page.unroute("**/glean/api/translate");
   await page.getByRole("button", { name: "重试", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(
     "Soft and calm; not rough or strong.",

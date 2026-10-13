@@ -31,8 +31,8 @@ app.use((_req, res, next) => {
 });
 if (production) {
   const root = resolve("dist/client");
-  app.use("/reader", express.static(root, { index: false }));
-  app.get(/^\/reader\/(?!assets\/|pdf-assets\/).*/, (req, res, next) => {
+  app.use("/glean", express.static(root, { index: false }));
+  app.get(/^\/glean\/(?!assets\/|pdf-assets\/).*/, (req, res, next) => {
     if (!req.accepts("html") || /\.[a-z0-9]+$/i.test(req.path)) {
       next();
       return;
@@ -44,7 +44,7 @@ if (production) {
   const pdfRoot = dirname(require.resolve("pdfjs-dist/package.json"));
   for (const name of ["cmaps", "standard_fonts", "wasm", "iccs"])
     app.use(
-      `/reader/pdf-assets/${name}`,
+      `/glean/pdf-assets/${name}`,
       express.static(resolve(pdfRoot, name)),
     );
   const { createServer } = await import("vite");
@@ -59,7 +59,7 @@ if (production) {
       next(error);
     });
   });
-  app.get(/^\/reader\/.*/, async (req, res, next) => {
+  app.get(/^\/glean\/.*/, async (req, res, next) => {
     try {
       const html = await vite.transformIndexHtml(
         req.originalUrl,
@@ -73,7 +73,7 @@ if (production) {
 }
 app.use((_req, res) => res.status(404).type("text").send("Not found"));
 const server = app.listen(config.port, config.host, () => {
-  console.log(`Reader: http://${config.host}:${config.port}/reader/`);
+  console.log(`Glean: http://${config.host}:${config.port}/glean/`);
   console.log(
     isConfigured(config)
       ? "模型配置已加载。"

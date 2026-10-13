@@ -16,7 +16,7 @@ export default defineConfig({
   },
   webServer: {
     command: "npx tsx tests/serve-e2e.ts",
-    url: "http://127.0.0.1:43137/reader/api/health",
+    url: "http://127.0.0.1:43137/glean/api/health",
     reuseExistingServer: false,
     timeout: 30000,
   },

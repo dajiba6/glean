@@ -6,7 +6,7 @@ export async function translate(
   signal: AbortSignal,
   onDelta: (text: string) => void,
 ) {
-  const response = await fetch("/reader/api/translate", {
+  const response = await fetch("/glean/api/translate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, language }),

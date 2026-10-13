@@ -1,0 +1,23 @@
+[Unit]
+Description=Glean web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/glean/current
+ExecStart=%h/.nvm/versions/node/v22.22.2/bin/node --use-env-proxy dist/server/server/index.js
+Environment=NODE_ENV=production
+Environment=HOST=172.17.0.1
+Environment=PORT=3000
+Environment=READER_CONFIG=%h/.config/glean/config.json
+Environment=HTTPS_PROXY=http://127.0.0.1:7897
+Environment=HTTP_PROXY=http://127.0.0.1:7897
+Environment=NO_PROXY=localhost,127.0.0.1,172.17.0.1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

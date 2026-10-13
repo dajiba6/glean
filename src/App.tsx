@@ -56,7 +56,7 @@ export default function App() {
     const timer = setTimeout(() => abort.abort(), 5000);
     let alive = true;
     setHealth("checking");
-    fetch("/reader/api/health", { signal: abort.signal })
+    fetch("/glean/api/health", { signal: abort.signal })
       .then((response) => {
         if (!response.ok) throw new Error();
         return response.json();
@@ -246,7 +246,7 @@ export default function App() {
             <div className="section-intro">
               <span className="section-eyebrow">从兴趣出发，留在原文里</span>
               <h2 id="features-title">让解释，也成为语言输入</h2>
-              <p>你想读的那本书，可能还稍微有点难。Reader 帮你解开眼前的词句，让阅读继续。</p>
+              <p>你想读的那本书，可能还稍微有点难。Glean 帮你解开眼前的词句，让阅读继续。</p>
             </div>
             <div className="feature-grid">
               <article>
@@ -272,20 +272,20 @@ export default function App() {
             <div className="section-intro">
               <span className="section-eyebrow">设计背后的语言学习理念</span>
               <h2 id="theory-title">为什么先用原文的语言解释？</h2>
-              <p>Reader 的设计受到语言学家 Stephen Krashen 的第二语言习得理论启发：在感兴趣的阅读中，接触更多能够理解的原文。</p>
+              <p>Glean 的设计受到语言学家 Stephen Krashen 的第二语言习得理论启发：在感兴趣的阅读中，接触更多能够理解的原文。</p>
             </div>
             <div className="theory-list">
               <article>
                 <div><span>可理解输入假说</span><h3>理解，是语言习得的起点</h3></div>
-                <p>这一假说认为，人通过理解包含略高于现有水平的语言内容来发展语言能力。Reader 用同一种语言里更简单的词句解释难点，帮助你读懂眼前的原文，让解释本身也成为语言输入。</p>
+                <p>这一假说认为，人通过理解包含略高于现有水平的语言内容来发展语言能力。Glean 用同一种语言里更简单的词句解释难点，帮助你读懂眼前的原文，让解释本身也成为语言输入。</p>
               </article>
               <article>
                 <div><span>习得与学习假说</span><h3>在理解意思的过程中，熟悉语言</h3></div>
-                <p>Krashen 区分了在有意义的交流中自然习得语言，与有意识地学习语言规则。Reader 鼓励你把注意力放在故事、观点和表达上，先通过原文语言理解，中文作为需要时的辅助。</p>
+                <p>Krashen 区分了在有意义的交流中自然习得语言，与有意识地学习语言规则。Glean 鼓励你把注意力放在故事、观点和表达上，先通过原文语言理解，中文作为需要时的辅助。</p>
               </article>
               <article>
                 <div><span>情感过滤假说</span><h3>少一点焦虑，多一点阅读的意愿</h3></div>
-                <p>这一假说强调动机、自信和焦虑对语言习得的影响。自己选择感兴趣的原著，卡住时随时获得帮助，是 Reader 希望降低阅读压力、支持持续阅读的方式。</p>
+                <p>这一假说强调动机、自信和焦虑对语言习得的影响。自己选择感兴趣的原著，卡住时随时获得帮助，是 Glean 希望降低阅读压力、支持持续阅读的方式。</p>
               </article>
             </div>
           </section>

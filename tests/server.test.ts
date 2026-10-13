@@ -30,7 +30,7 @@ async function withApp(
   }
 }
 const request = (url: string, body: unknown, signal?: AbortSignal) =>
-  fetch(`${url}/reader/api/translate`, {
+  fetch(`${url}/glean/api/translate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -42,17 +42,17 @@ const sse = (value: string) =>
 test("health does not call model or expose credentials; redirects preserve base and query; API 404 is JSON", async () => {
   await withApp(
     async (url) => {
-      assert.deepEqual(await (await fetch(url + "/reader/api/health")).json(), {
+      assert.deepEqual(await (await fetch(url + "/glean/api/health")).json(), {
         status: "ok",
         llmConfigured: true,
         translationTimeoutMs: 1000,
       });
-      const redirect = await fetch(url + "/reader?hello=1", {
+      const redirect = await fetch(url + "/glean?hello=1", {
         redirect: "manual",
       });
       assert.equal(redirect.status, 308);
-      assert.equal(redirect.headers.get("location"), "/reader/?hello=1");
-      const missing = await fetch(url + "/reader/api/missing");
+      assert.equal(redirect.headers.get("location"), "/glean/?hello=1");
+      const missing = await fetch(url + "/glean/api/missing");
       assert.equal(missing.status, 404);
       assert.match(missing.headers.get("content-type")!, /json/);
     },
@@ -106,7 +106,7 @@ test("invalid input, malformed JSON and missing config produce JSON errors", asy
         (await request(url, { text: "hello", language: "fr" })).status,
         400,
       );
-      const bad = await fetch(url + "/reader/api/translate", {
+      const bad = await fetch(url + "/glean/api/translate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{",

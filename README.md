@@ -1,6 +1,6 @@
 <div align="center">
 
-# Reader.
+# Glean.
 
 ### 跨过语言壁垒，看见更广阔的世界
 
@@ -15,9 +15,9 @@
 
 </div>
 
-![Reader 首页：原文阅读介绍与动态 ASCII 极光](docs/images/home.png)
+![Glean 首页：原文阅读介绍与动态 ASCII 极光](docs/images/home.png)
 
-你想读的那本书，可能还稍微有点难。Reader 让你打开自己的 EPUB 或 PDF，遇到不懂的词句，先用同一种语言去理解它。还是无法理解，再进入中文，然后回到原文。
+你想读的那本书，可能还稍微有点难。Glean 让你打开自己的 EPUB 或 PDF，遇到不懂的词句，先用同一种语言去理解它。还是无法理解，再进入中文，然后回到原文。
 
 ## 阅读体验
 
@@ -33,35 +33,35 @@
 
 就地选词、查看解释、接着阅读。解释支持取消、超时提示和手动重试，同一次阅读中的解释会缓存在内存里。
 
-![Reader 阅读界面与选词解释](docs/images/reading.png)
+![Glean 阅读界面与选词解释](docs/images/reading.png)
 
 <sub>截图使用项目自制示例文本与本地假模型，展示实际界面；真实解释由部署者配置的模型提供。</sub>
 
 ## 为什么先用原文的语言解释？
 
-Reader 的设计受到 Stephen Krashen 的第二语言习得理论启发：在感兴趣的阅读中，接触更多能够理解的原文。
+Glean 的设计受到 Stephen Krashen 的第二语言习得理论启发：在感兴趣的阅读中，接触更多能够理解的原文。
 
-| 理念 | 在 Reader 中的设计 |
+| 理念 | 在 Glean 中的设计 |
 | --- | --- |
 | **可理解输入假说** | 用同一种语言里更简单的词句解释难点，让解释也成为可理解的输入。 |
 | **习得与学习假说** | 鼓励关注故事、观点和意义，在阅读中熟悉语言；需要时再借助中文。 |
 | **情感过滤假说** | 自己选择有兴趣的作品，遇到困难时获得帮助，减少阅读压力。 |
 
-这些理论是设计启发，不代表产品效果已通过研究验证，也不意味着 Reader 会自动测量或精准匹配你的语言水平。
+这些理论是设计启发，不代表产品效果已通过研究验证，也不意味着 Glean 会自动测量或精准匹配你的语言水平。
 
 ## 快速开始
 
 需要 **Node.js 22.13+** 和 npm，无需数据库。
 
 ```bash
-git clone https://github.com/dajiba6/reader.git
-cd reader
+git clone https://github.com/dajiba6/glean.git
+cd glean
 npm ci
 cp config.example.json config.local.json
 npm run dev
 ```
 
-打开 **http://127.0.0.1:3000/reader/**，选择一本 EPUB 或 PDF 即可开始阅读。未配置模型时也可以读书。
+打开 **http://127.0.0.1:3000/glean/**，选择一本 EPUB 或 PDF 即可开始阅读。未配置模型时也可以读书。
 
 要启用解释，在 `config.local.json` 中填写 OpenAI 兼容接口配置，然后重启服务：
 

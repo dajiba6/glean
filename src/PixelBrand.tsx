@@ -1,22 +1,21 @@
-// Original Reader glyphs, using the same SVG pixel construction as the personal-site logo.
+// Original Glean glyphs, using the same SVG pixel construction as the personal-site logo.
 const glyphs = [
-  ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
+  [".###.", "#...#", "#....", "#.###", "#...#", "#...#", ".###."],
+  [".##..", "..#..", "..#..", "..#..", "..#..", "..#..", ".###."],
   [".....", ".....", ".###.", "#...#", "#####", "#....", ".####"],
   [".....", ".....", ".###.", "....#", ".####", "#...#", ".####"],
-  ["....#", "....#", ".####", "#...#", "#...#", "#...#", ".####"],
-  [".....", ".....", ".###.", "#...#", "#####", "#....", ".####"],
-  [".....", ".....", "#.##.", "##..#", "#....", "#....", "#...."],
+  [".....", ".....", "####.", "#...#", "#...#", "#...#", "#...#"],
 ];
 
 export function PixelWordmark() {
   return (
     <svg
       className="pixel-wordmark"
-      viewBox="0 0 38 7"
-      width="114"
+      viewBox="0 0 32 7"
+      width="96"
       height="21"
       role="img"
-      aria-label="Reader"
+      aria-label="Glean"
       shapeRendering="crispEdges"
     >
       {glyphs.flatMap((glyph, index) =>
@@ -32,7 +31,7 @@ export function PixelWordmark() {
           )),
         ),
       )}
-      <rect className="brand-dot" x="36" y="6" width="2" height="1" />
+      <rect className="brand-dot" x="30" y="6" width="2" height="1" />
     </svg>
   );
 }
